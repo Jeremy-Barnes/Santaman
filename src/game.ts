@@ -1,14 +1,19 @@
 import 'phaser';
+import Elf from './elf'
+import Pedestrian from './pedestrian';
+import Snowball from './snowball';
 
 export default class NorthPoleDropZone extends Phaser.Scene
 {
     private cursors : Phaser.Types.Input.Keyboard.CursorKeys;
     private player : Phaser.Physics.Arcade.Sprite;
-    private roofTop: Phaser.Physics.Arcade.StaticGroup;
     
-    private targets : Phaser.Physics.Arcade.Sprite[] = [];
+    // private targets : Phaser.Physics.Arcade.Sprite[] = [];
+    private targetsElf : Pedestrian[] = [];
 
-    private environment: Phaser.Physics.Arcade.StaticGroup;
+
+    private ground: Phaser.Physics.Arcade.StaticGroup;
+    private santaPerch: Phaser.Physics.Arcade.StaticGroup;
 
     private lastTargetAddTime : number = 0; 
     private text;
@@ -20,15 +25,12 @@ export default class NorthPoleDropZone extends Phaser.Scene
 
     update(time, delta){
 
-        this.text.setText([
-            `${this.input.activePointer.worldX} world x ${this.input.x} input x`,
-        ]);
-
         if(this.input.activePointer.isDown) {
             if(this.input.activePointer.x > this.player.x) {
                 this.player.setVelocityX(160);
+            } else if(this.input.activePointer.x < this.player.x) {
+                this.player.setVelocityX(-160);
             }
-
         }
         else {
             if (this.cursors.left.isDown)
@@ -58,25 +60,32 @@ export default class NorthPoleDropZone extends Phaser.Scene
         this.conditionallyAddTarget(time);
     }
 
-    conditionallyAddTarget(time: number){
+    addSnowball(santaX: number, santaY: number){
+        let snowball = new Snowball(this, santaX, santaY-10);
+        this.physics.add.collider(snowball.sprite, this.targetsElf.map(elf => elf.sprite), this.collide.bind(this));
+        this.physics.add.collider(snowball.sprite, this.ground, snowball.collide.bind(snowball));
+    }
+
+    collide(object1 : Phaser.Types.Physics.Arcade.GameObjectWithBody, object2 : Phaser.Physics.Arcade.Sprite)
+    {
+        object1.getData('object').collide(object2);
+        object2.getData('object').collide(object1);
+    }
+
+    private conditionallyAddTarget(time: number){
         let rand = Math.random();
         if(rand < .7 && time - this.lastTargetAddTime > 1000) {
             this.lastTargetAddTime = time;
-            let target = this.physics.add.sprite(-200, phaserGameHeight-200, 'target');
 
-            target.anims.play("targetRight");
-
-            target.anims.msPerFrame = Math.min((1000/15)/rand, 1000/11);
-
-            target.setVelocityX(200 * rand);
-            this.physics.add.collider(target, this.environment);
-            target.setCollideWorldBounds(false);
-            this.targets.push(target);
+            let elf = new Elf(this, -200, phaserGameHeight-200)
+            this.targetsElf.push(elf);
+            this.physics.add.collider(elf.sprite, this.ground);
+            elf.sprite.setCollideWorldBounds(false);
         }
     }
 
 
-    preload()
+    public preload()
     {
         this.load.image('ground', 'assets/platform.png');
         this.load.image('sky', 'assets/sky.png');
@@ -85,44 +94,41 @@ export default class NorthPoleDropZone extends Phaser.Scene
             'assets/theSantaman.png',
             { frameWidth: 96, frameHeight: 96 }
         );
-
-        
-        this.load.spritesheet('target', 
-            'assets/target.png',
-            { frameWidth: 32, frameHeight: 48 }
-        );
+        Elf.preloadAssets(this);
+        Snowball.preloadAssets(this);
     }
 
-    create(){
+    public create(){
 
         let skyImage = this.add.image(phaserGameWidth/2, phaserGameHeight/2, 'sky');
         skyImage.setScale(phaserGameWidth/skyImage.width, phaserGameHeight/skyImage.height);
         this.createDropZone();
-        this.loadSprites();
 
         this.input.mouse.disableContextMenu();
+        this.loadSantaman();
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.input.addPointer(1);
         this.input.on('pointerup', function (pointer) {
             if(pointer.getDuration() < 200 && pointer.getDuration() > 1) {
-                alert("wow!");
+                this.addSnowball(this.player.x, this.player.y);
             }
-        });
-            this.text = this.add.text(10, 10, 'Use up to 4 fingers at once', { font: '16px Courier', fill: '#00ff00' });
-        // const logo = this.add.image(400, 70, 'logo');
+        }.bind(this));
+        Elf.create(this);
+        // this.text = this.add.text(10, 10, 'Use up to 4 fingers at once', { font: '16px Courier', fill: '#00ff00' });
     }
 
     createDropZone(){
-        this.environment = this.physics.add.staticGroup();
+        this.ground = this.physics.add.staticGroup();
 
-        this.environment.create(phaserGameWidth/2, phaserGameHeight, 'ground').setScale(2).refreshBody();//ground
-        this.environment.create(phaserGameWidth/2, phaserGameHeight/4, 'ground');//perch
+        this.ground.create(phaserGameWidth/2, phaserGameHeight, 'ground').setScale(2).refreshBody();//ground
+        this.santaPerch =  this.physics.add.staticGroup();
+        this.santaPerch.create(phaserGameWidth/2, phaserGameHeight/4, 'ground');//perch
     }
 
-    loadSprites(){
+    loadSantaman(){
         this.player = this.physics.add.sprite(100, 50, 'santa');
-        this.physics.add.collider(this.player, this.environment);
+        this.physics.add.collider(this.player, this.santaPerch);
         this.player.setBounce(0.2);
         this.player.setCollideWorldBounds(true);
 
@@ -145,13 +151,6 @@ export default class NorthPoleDropZone extends Phaser.Scene
             frameRate: 10,
             repeat: -1
         });
-
-        this.anims.create({
-            key: "targetRight",
-            frames: this.anims.generateFrameNumbers('target', { start: 5, end: 8 }),
-            frameRate: 15,
-            repeat: -1
-        })
     }
 }
 

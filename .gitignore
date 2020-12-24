@@ -12,5 +12,6 @@ node_modules/
 # Build
 /npm-debug.log
 
-#"Compile"
-/dist/*.js.*
+# Output
+/dist/*.js
+/dist/*.html
