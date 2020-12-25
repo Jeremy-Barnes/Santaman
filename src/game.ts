@@ -2,6 +2,7 @@ import 'phaser';
 import Elf from './elf'
 import Pedestrian from './pedestrian';
 import Snowball from './snowball';
+import Menu from './menu'
 
 export default class NorthPoleDropZone extends Phaser.Scene
 {
@@ -9,8 +10,8 @@ export default class NorthPoleDropZone extends Phaser.Scene
     private player : Phaser.Physics.Arcade.Sprite;
     
     // private targets : Phaser.Physics.Arcade.Sprite[] = [];
-    private targetsElf : Pedestrian[] = [];
-
+    // private targetsElf : Pedestrian[] = [];
+    private pedestrians : Phaser.GameObjects.Group;
 
     private ground: Phaser.Physics.Arcade.StaticGroup;
     private santaPerch: Phaser.Physics.Arcade.StaticGroup;
@@ -49,7 +50,7 @@ export default class NorthPoleDropZone extends Phaser.Scene
             {
                 this.player.setVelocityX(0);
 
-                this.player.anims.play('turn');
+                this.player.anims.play('front');
             }
 
             if (this.cursors.up.isDown && this.player.body.touching.down)
@@ -61,8 +62,8 @@ export default class NorthPoleDropZone extends Phaser.Scene
     }
 
     addSnowball(santaX: number, santaY: number){
-        let snowball = new Snowball(this, santaX, santaY-10);
-        this.physics.add.collider(snowball.sprite, this.targetsElf.map(elf => elf.sprite), this.collide.bind(this));
+        let snowball = new Snowball(this, santaX, santaY-25);
+        this.physics.add.collider(snowball.sprite, this.pedestrians/*this.targetsElf.map(elf => elf.sprite)*/, this.collide.bind(this));
         this.physics.add.collider(snowball.sprite, this.ground, snowball.collide.bind(snowball));
     }
 
@@ -77,10 +78,14 @@ export default class NorthPoleDropZone extends Phaser.Scene
         if(rand < .7 && time - this.lastTargetAddTime > 1000) {
             this.lastTargetAddTime = time;
 
-            let elf = new Elf(this, -200, phaserGameHeight-200)
-            this.targetsElf.push(elf);
-            this.physics.add.collider(elf.sprite, this.ground);
-            elf.sprite.setCollideWorldBounds(false);
+            let elf = new Elf(this, -100, phaserGameHeight-200)
+            // this.targetsElf.push(elf);
+            this.pedestrians.add(elf.sprite, true);
+            this.pedestrians.getChildren().forEach(e => (<any>e.getData('object')).startWorldCollision());
+            
+            elf.startWorldCollision();
+            // this.physics.add.collider(elf.sprite, this.ground);
+            // elf.sprite.setCollideWorldBounds(false);
         }
     }
 
@@ -91,15 +96,14 @@ export default class NorthPoleDropZone extends Phaser.Scene
         this.load.image('sky', 'assets/sky.png');
 
         this.load.spritesheet('santa', 
-            'assets/theSantaman.png',
-            { frameWidth: 96, frameHeight: 96 }
+            'assets/santasheet.png',
+            { frameWidth: 116, frameHeight: 144 }
         );
         Elf.preloadAssets(this);
         Snowball.preloadAssets(this);
     }
 
     public create(){
-
         let skyImage = this.add.image(phaserGameWidth/2, phaserGameHeight/2, 'sky');
         skyImage.setScale(phaserGameWidth/skyImage.width, phaserGameHeight/skyImage.height);
         this.createDropZone();
@@ -115,6 +119,17 @@ export default class NorthPoleDropZone extends Phaser.Scene
             }
         }.bind(this));
         Elf.create(this);
+
+        this.pedestrians = this.add.group();        
+        this.physics.world.setBounds(-200, -200, phaserGameWidth+400, phaserGameHeight + 400, true, true, true, true);
+        this.physics.world.setBoundsCollision(true, true, true, true);
+        this.physics.world.on(Phaser.Physics.Arcade.Events.WORLD_BOUNDS, (a) => {
+             a.gameObject.getData('object').collideWorldBounds();
+        });
+        this.physics.add.collider(this.pedestrians, this.ground);
+        this.scene.run('menu');
+        this.scene.pause();
+
         // this.text = this.add.text(10, 10, 'Use up to 4 fingers at once', { font: '16px Courier', fill: '#00ff00' });
     }
 
@@ -127,27 +142,28 @@ export default class NorthPoleDropZone extends Phaser.Scene
     }
 
     loadSantaman(){
-        this.player = this.physics.add.sprite(100, 50, 'santa');
+        this.player = this.physics.add.sprite(100, 50, 'santa').setScale(.5);
         this.physics.add.collider(this.player, this.santaPerch);
         this.player.setBounce(0.2);
         this.player.setCollideWorldBounds(true);
 
         this.anims.create({
             key: 'right',
-            frames: this.anims.generateFrameNumbers('santa', { start: 8, end: 16 }),
+            frames: this.anims.generateFrameNumbers('santa', { start: 1, end: 1 }),
             frameRate: 10,
             repeat: -1
         });
 
         this.anims.create({
-            key: 'turn',
-            frames: [ { key: 'santa', frame: 90 } ],
-            frameRate: 20
+            key: 'left',
+            frames: this.anims.generateFrameNumbers('santa', { start: 2, end: 2 }),
+            frameRate: 10,
+            repeat: -1
         });
 
         this.anims.create({
-            key: 'left',
-            frames: this.anims.generateFrameNumbers('santa', { start: 98, end: 106 }),
+            key: 'front',
+            frames: this.anims.generateFrameNumbers('santa', { start: 0, end: 0 }),
             frameRate: 10,
             repeat: -1
         });
@@ -169,7 +185,7 @@ const config : Phaser.Types.Core.GameConfig = {
             debug: false
         }
     },
-    scene: NorthPoleDropZone
+    scene: [NorthPoleDropZone, Menu]
 };
 
 const game = new Phaser.Game(config);

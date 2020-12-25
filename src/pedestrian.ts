@@ -7,4 +7,5 @@ export default interface Pedestrian extends Collidable
     wounded : boolean;
     
     collide(object1 : Phaser.Types.Physics.Arcade.GameObjectWithBody, object2 : Phaser.Physics.Arcade.Sprite);
+    collideWorldBounds();
 }

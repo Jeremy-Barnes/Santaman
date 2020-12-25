@@ -20,6 +20,8 @@ export default class Snowball implements Collidable
         this.sprite.destroy();
     }
 
+    public collideWorldBounds(){
+    }
   
 
     static preloadAssets(phaser : Phaser.Scene){
