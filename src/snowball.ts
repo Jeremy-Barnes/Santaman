@@ -9,7 +9,7 @@ export default class Snowball implements Collidable
     {
         let rand = Math.random();
         this.sprite = phaser.physics.add.sprite(xPos, yPos, "snowball");
-        this.sprite.setScale(.12);
+        this.sprite.setScale(.5).refreshBody();
         this.sprite.setVelocityY(100);
         this.sprite.setData("object", this);
         this.sprite.setCollideWorldBounds(true);

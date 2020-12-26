@@ -3,34 +3,48 @@ import Elf from './elf'
 import Pedestrian from './pedestrian';
 import Snowball from './snowball';
 import Menu from './menu'
+import MrsClaus from './mrsclaus';
+import Reindeer from './reindeer';
+import Goblin from './goblin';
 
 export default class NorthPoleDropZone extends Phaser.Scene
 {
+    static restart: boolean = false;
     private cursors : Phaser.Types.Input.Keyboard.CursorKeys;
     private player : Phaser.Physics.Arcade.Sprite;
-    
-    // private targets : Phaser.Physics.Arcade.Sprite[] = [];
-    // private targetsElf : Pedestrian[] = [];
+
     private pedestrians : Phaser.GameObjects.Group;
 
     private ground: Phaser.Physics.Arcade.StaticGroup;
+    private santaFallZone: Phaser.Physics.Arcade.StaticGroup;
+
     private santaPerch: Phaser.Physics.Arcade.StaticGroup;
 
     private lastTargetAddTime : number = 0; 
-    private text;
-
+    private mrsClausSpawned : boolean;
+    private score = 0;
+    private scoreText: Phaser.GameObjects.Text;
+    private firstStart = true;
     constructor ()
     {
         super('NorthPoleDropZone');
     }
 
     update(time, delta){
-
+        if(NorthPoleDropZone.restart){
+            NorthPoleDropZone.restart = false;
+            this.scene.restart();
+            return;
+        }
         if(this.input.activePointer.isDown) {
-            if(this.input.activePointer.x > this.player.x) {
+            if((this.input.activePointer.x - this.player.x) > 45) {
                 this.player.setVelocityX(160);
-            } else if(this.input.activePointer.x < this.player.x) {
+                this.player.anims.play('right', true);
+            } else if((this.input.activePointer.x - this.player.x) < -45) {
+                this.player.anims.play('left', true);
                 this.player.setVelocityX(-160);
+            } else {
+                this.player.body.stop();
             }
         }
         else {
@@ -52,17 +66,12 @@ export default class NorthPoleDropZone extends Phaser.Scene
 
                 this.player.anims.play('front');
             }
-
-            if (this.cursors.up.isDown && this.player.body.touching.down)
-            {
-                this.player.setVelocityY(-330);
-            }
         }
         this.conditionallyAddTarget(time);
     }
 
     addSnowball(santaX: number, santaY: number){
-        let snowball = new Snowball(this, santaX, santaY-25);
+        let snowball = new Snowball(this, santaX, santaY + 20);
         this.physics.add.collider(snowball.sprite, this.pedestrians/*this.targetsElf.map(elf => elf.sprite)*/, this.collide.bind(this));
         this.physics.add.collider(snowball.sprite, this.ground, snowball.collide.bind(snowball));
     }
@@ -75,24 +84,63 @@ export default class NorthPoleDropZone extends Phaser.Scene
 
     private conditionallyAddTarget(time: number){
         let rand = Math.random();
-        if(rand < .7 && time - this.lastTargetAddTime > 1000) {
-            this.lastTargetAddTime = time;
 
-            let elf = new Elf(this, -100, phaserGameHeight-200)
-            // this.targetsElf.push(elf);
+        if(rand > .98 && time - this.lastTargetAddTime >  Math.max(600-this.score/300, ((1000)- Math.pow(2, this.score/55)))){
+            let reindeer = new Reindeer(this, 0, 200 + (Math.random() * 300));
+            this.pedestrians.add(reindeer.sprite, true);
+            reindeer.startWorldCollision();
+        }
+        if(rand < .7 && time - this.lastTargetAddTime > (800)) {
+            this.lastTargetAddTime = time;
+            let dir = 'left';
+            let x = 610;
+            if(rand < .3) {
+                dir = 'right';
+                x = -10;
+            }
+            let elf = new Elf(this, x, phaserGameHeight-80, dir)
             this.pedestrians.add(elf.sprite, true);
-            this.pedestrians.getChildren().forEach(e => (<any>e.getData('object')).startWorldCollision());
-            
             elf.startWorldCollision();
-            // this.physics.add.collider(elf.sprite, this.ground);
-            // elf.sprite.setCollideWorldBounds(false);
+        }
+        if(rand > .95  && time - this.lastTargetAddTime > 500 && !this.mrsClausSpawned) {
+            this.mrsClausSpawned = true;
+
+            let dir = 'left';
+            let x = 600;
+            if(Math.random() < .4) {
+                dir = 'right';
+                x = -10;
+            }
+
+            let mc = new MrsClaus(this, x, phaserGameHeight-100, dir)
+            this.pedestrians.add(mc.sprite, true);
+            mc.startWorldCollision();
+        } else if(this.mrsClausSpawned) {
+            if(!this.pedestrians.getChildren().find(x => x.name == "mrsclaus"))
+            this.mrsClausSpawned = false;
+        }
+        if(rand >= .99 && time - this.lastTargetAddTime > 500) {
+            this.lastTargetAddTime = time;
+            let dir = 'left';
+            let x = 610;
+            if(rand > .995) {
+                dir = 'right';
+                x = -10;
+            }
+            let gob = new Goblin(this, x, phaserGameHeight-80, dir)
+            this.pedestrians.add(gob.sprite, true);
+            gob.startWorldCollision();
         }
     }
 
 
     public preload()
     {
-        this.load.image('ground', 'assets/platform.png');
+        this.load.image('ground', 'assets/ground.png');
+        this.load.image('building', 'assets/building.png');
+        this.load.image('side1', 'assets/side1.png');
+        this.load.image('side2', 'assets/side2.png');
+        this.load.image('santaperch', 'assets/santaperch.png')
         this.load.image('sky', 'assets/sky.png');
 
         this.load.spritesheet('santa', 
@@ -100,15 +148,21 @@ export default class NorthPoleDropZone extends Phaser.Scene
             { frameWidth: 116, frameHeight: 144 }
         );
         Elf.preloadAssets(this);
+        Goblin.preloadAssets(this);
+        Reindeer.preloadAssets(this);
+        MrsClaus.preloadAssets(this);
         Snowball.preloadAssets(this);
     }
 
     public create(){
+        this.score = 0;
+
+        this.input.mouse.disableContextMenu();
+
         let skyImage = this.add.image(phaserGameWidth/2, phaserGameHeight/2, 'sky');
         skyImage.setScale(phaserGameWidth/skyImage.width, phaserGameHeight/skyImage.height);
         this.createDropZone();
 
-        this.input.mouse.disableContextMenu();
         this.loadSantaman();
 
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -118,8 +172,16 @@ export default class NorthPoleDropZone extends Phaser.Scene
                 this.addSnowball(this.player.x, this.player.y);
             }
         }.bind(this));
-        Elf.create(this);
 
+        this.input.keyboard.on('keydown-SPACE', function (event) {
+            this.addSnowball(this.player.x, this.player.y);
+        }.bind(this));
+        this.input.keyboard.addCapture('SPACE');
+
+        Elf.create(this);
+        Goblin.create(this);
+        Reindeer.create(this);
+        MrsClaus.create(this);
         this.pedestrians = this.add.group();        
         this.physics.world.setBounds(-200, -200, phaserGameWidth+400, phaserGameHeight + 400, true, true, true, true);
         this.physics.world.setBoundsCollision(true, true, true, true);
@@ -127,25 +189,74 @@ export default class NorthPoleDropZone extends Phaser.Scene
              a.gameObject.getData('object').collideWorldBounds();
         });
         this.physics.add.collider(this.pedestrians, this.ground);
-        this.scene.run('menu');
-        this.scene.pause();
 
-        // this.text = this.add.text(10, 10, 'Use up to 4 fingers at once', { font: '16px Courier', fill: '#00ff00' });
+        this.scoreText = this.add.text(500, 25, this.score.toString(), { font: '25px Slackey', fill: '#ffffff' });
+
+        if(this.firstStart == true){
+            this.firstStart = false;
+            this.scene.run('menu');
+            this.scene.pause();
+        }
+    }
+
+    public updateGameScore(points: number, gameOver: boolean, message: string = null){
+        this.score += points;
+        this.scoreText.setText(this.score.toString());
+        if(gameOver){
+            this.time.delayedCall(1500, (() =>{
+                NorthPoleDropZone.restart = true;
+            }), null, this);
+
+            this.time.delayedCall(1300, (() =>{
+                Menu.setTitle("Game Over!");
+                if(message){
+                    Menu.setBody(message);
+                }
+                this.scene.pause();
+
+                this.scene.run('menu');
+            }), null, this);
+        }
     }
 
     createDropZone(){
-        this.ground = this.physics.add.staticGroup();
 
-        this.ground.create(phaserGameWidth/2, phaserGameHeight, 'ground').setScale(2).refreshBody();//ground
-        this.santaPerch =  this.physics.add.staticGroup();
-        this.santaPerch.create(phaserGameWidth/2, phaserGameHeight/4, 'ground');//perch
+        this.santaPerch = this.physics.add.staticGroup();
+        this.santaPerch.create(phaserGameWidth/2, phaserGameHeight-230, 'building').setScale(.5).refreshBody();//perch
+
+        var side1 = this.physics.add.staticGroup();
+        side1.create(0, 365, 'side1').setScale(.5).refreshBody();
+
+        var side2 = this.physics.add.staticGroup();
+        side2.create(phaserGameWidth, 420, 'side2').setScale(.5).refreshBody();
+
+        this.ground = this.physics.add.staticGroup();
+        this.ground.create(phaserGameWidth/2, phaserGameHeight, 'ground').setScale(.5).refreshBody();//ground
+
+
     }
 
     loadSantaman(){
-        this.player = this.physics.add.sprite(100, 50, 'santa').setScale(.5);
+        this.player = this.physics.add.sprite(300, 80, 'santa').setScale(.66);
+        this.player.setSize(2, 144);
+        this.player.setDisplaySize(116*.66, 144*.66);
+        
         this.physics.add.collider(this.player, this.santaPerch);
-        this.player.setBounce(0.2);
+        this.player.setBounce(.1);
+        this.physics.add.collider(this.player, this.ground, (() => 
+            {
+                // this.player.body.enable = false;
+                // this.updateGameScore(0, true, "Santa fell off the roof! \r\n Christmas is ruined!")
+            }).bind(this));
         this.player.setCollideWorldBounds(true);
+
+        this.santaFallZone = this.physics.add.staticGroup();
+        this.santaFallZone.create(phaserGameWidth/2, 400, 'ground')
+        this.santaFallZone.setVisible(false);
+        this.physics.add.overlap(this.santaFallZone, this.player,  (() => 
+        {
+            this.updateGameScore(0, true, "Santa fell off the roof! \r\n Christmas is ruined!")
+        }).bind(this));
 
         this.anims.create({
             key: 'right',
@@ -167,6 +278,9 @@ export default class NorthPoleDropZone extends Phaser.Scene
             frameRate: 10,
             repeat: -1
         });
+        var parapet = this.physics.add.staticGroup();
+        parapet.create(phaserGameWidth/2, 165, 'santaperch').setScale(.5).refreshBody();
+        
     }
 }
 
@@ -177,7 +291,11 @@ const config : Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     backgroundColor: '#00000',
     width: phaserGameWidth,
-    height: phaserGameHeight,
+    height: phaserGameHeight + 300,
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+    },
     physics: {
         default: 'arcade',
         arcade: {
